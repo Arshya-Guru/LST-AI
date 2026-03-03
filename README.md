@@ -5,8 +5,176 @@ LST-AI was collaboratively developed by the Department of Neurology and Departme
 
 <img src="figures/header.png" alt="Overview" width="1000" height="600" title="Meet LST-AI.">
 
-
 **Disclaimer:** LST-AI is a research-only tool for MS Lesion Segmentation and has not been validated, licensed or approved for any clinical usage.
+
+---
+
+## Quick Start: Running Inference with Pixi
+
+This is the recommended way to install and run LST-AI. [Pixi](https://pixi.sh) handles the entire environment for you — Python, all conda and pip dependencies, and the `greedy` registration tool — in a single command. No virtual environments, no compiling from source, no dependency headaches.
+
+> **Requirements:** You need internet access for installation and the first run (model weights are downloaded automatically). Run these steps on a **local machine, VM, or login node** — not inside a batch job.
+
+### Step 1: Install pixi (if you don't already have it)
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+```
+
+This installs pixi to `~/.pixi/bin` and adds it to your shell. Either restart your shell or run:
+
+```bash
+source ~/.bashrc   # or ~/.zshrc, depending on your shell
+```
+
+Verify it's working:
+
+```bash
+pixi --version
+```
+
+### Step 2: Clone and install LST-AI
+
+```bash
+git clone https://github.com/CompImg/LST-AI.git
+cd LST-AI
+pixi install
+```
+
+`pixi install` will resolve and download all dependencies (this takes a few minutes the first time). You'll see progress bars for ~279 conda packages and ~47 pip packages. The warning about `run-post-link-scripts` is harmless and can be ignored.
+
+### Step 3: Download model weights
+
+On the first run, LST-AI needs to download model weights, atlas files, and binaries (~several hundred MB). This happens automatically:
+
+```bash
+pixi run lst --help
+```
+
+This triggers the download and also confirms the CLI is working. You should see the full list of arguments printed to your terminal.
+
+### Step 4: Run inference on a subject
+
+LST-AI expects **zipped NIfTI files (`.nii.gz`)** as input and assumes images are **NOT skull-stripped** (unless you pass `--stripped`).
+
+#### Basic usage (GPU):
+
+```bash
+pixi run lst \
+  --t1 /path/to/sub-001_T1w.nii.gz \
+  --flair /path/to/sub-001_FLAIR.nii.gz \
+  --output /path/to/output_dir \
+  --temp /path/to/temp_dir \
+  --device 0
+```
+
+#### CPU-only (no GPU available):
+
+```bash
+pixi run lst \
+  --t1 /path/to/sub-001_T1w.nii.gz \
+  --flair /path/to/sub-001_FLAIR.nii.gz \
+  --output /path/to/output_dir \
+  --temp /path/to/temp_dir \
+  --device cpu
+```
+
+#### What each flag does:
+
+| Flag | Required | Description |
+|---|---|---|
+| `--t1` | Yes | Path to the T1-weighted image (`.nii.gz`) |
+| `--flair` | Yes | Path to the FLAIR image (`.nii.gz`) |
+| `--output` | Yes | Directory where results will be saved |
+| `--temp` | No | Directory for intermediate files (MNI-space images, brain masks, etc.). If omitted, a temporary directory is created and deleted after the run. |
+| `--device` | No | GPU ID (e.g. `0`, `1`) or `cpu`. Defaults to `0`. |
+| `--threads` | No | Number of threads for the registration step. Defaults to all available cores. |
+| `--stripped` | No | Pass this flag if your images are already skull-stripped. **Do not use this if they are not** — it will severely affect segmentation quality. |
+| `--segment_only` | No | Skip lesion annotation, only output the binary segmentation mask. |
+| `--annotate_only` | No | Skip segmentation. Requires `--existing_seg` pointing to a binary mask in FLAIR space. |
+| `--threshold` | No | Threshold for binarizing the probability map (default: `0.5`). |
+| `--clipping` | No | Two values for intensity standardization percentiles (default: `0.5 99.5`). |
+| `--probability_map` | No | Also save per-model and ensemble probability maps. Requires `--temp`. |
+| `--fast-mode` | No | Use only one model for HD-BET skull stripping (faster but less accurate). |
+
+### Using a GPU on an HPC cluster (SLURM)
+
+If you're running on a cluster, you'll typically request a GPU via SLURM first, then run LST-AI inside that allocation. Here's a typical workflow:
+
+**1. Request an interactive GPU session:**
+
+```bash
+salloc --gres=gpu:1 --mem=16G --time=01:00:00
+```
+
+Or for a specific GPU type (check your cluster's docs for available partitions/constraints):
+
+```bash
+salloc --gres=gpu:1 --mem=16G --time=01:00:00 --partition=gpu
+```
+
+**2. Check which GPU device you were assigned:**
+
+Once your job starts, run:
+
+```bash
+nvidia-smi
+```
+
+This will show you the available GPU(s). The device ID is the number in the leftmost column (usually `0` if you requested one GPU). If `CUDA_VISIBLE_DEVICES` is set by your cluster scheduler, the device will almost always be `0` from your job's perspective regardless of the physical GPU assigned.
+
+You can double-check:
+
+```bash
+echo $CUDA_VISIBLE_DEVICES
+```
+
+**3. Run LST-AI with the correct device:**
+
+```bash
+cd /path/to/LST-AI
+
+pixi run lst \
+  --t1 /path/to/sub-001_T1w.nii.gz \
+  --flair /path/to/sub-001_FLAIR.nii.gz \
+  --output /path/to/output_dir \
+  --temp /path/to/temp_dir \
+  --device 0
+```
+
+> **Tip:** If `nvidia-smi` shows a GPU but LST-AI fails with a CUDA error, try `--device cpu` first to confirm the pipeline works, then debug the GPU issue separately.
+
+**4. Or submit as a batch job:**
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=lst-ai
+#SBATCH --gres=gpu:1
+#SBATCH --mem=16G
+#SBATCH --time=01:00:00
+#SBATCH --output=lst-ai_%j.log
+
+cd /path/to/LST-AI
+
+pixi run lst \
+  --t1 /data/sub-001_T1w.nii.gz \
+  --flair /data/sub-001_FLAIR.nii.gz \
+  --output /data/results/sub-001 \
+  --temp /data/temp/sub-001 \
+  --device 0
+```
+
+### Troubleshooting
+
+**`pixi: command not found`** — Restart your shell or run `source ~/.bashrc` after installing pixi.
+
+**Model download fails / times out** — You need internet access. On HPC clusters, this usually means running the first `pixi run lst --help` on a login node (which has internet), not inside a compute job.
+
+**`CUDA out of memory`** — Try `--fast-mode` to use a single HD-BET model, or fall back to `--device cpu`.
+
+**Permission denied writing model weights** — The models are extracted into the `LST_AI/` directory inside the repo. Make sure this directory is writable.
+
+---
 
 ## What is different, why or when should I switch?!
 * LST-AI is an advanced deep learning-based extension of the original LST with improved performance and additional features.

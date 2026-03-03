@@ -29,4 +29,5 @@ XLA_FLAGS = "--xla_gpu_cuda_data_dir=$PIXI_PROJECT_ROOT/LST_AI/.cuda_data"
 scripts = ["scripts/setup_cuda_data.sh"]
 
 [tasks]
-lst = "python $PIXI_PROJECT_ROOT/LST_AI/lst"
+download-models = "bash scripts/download_models.sh"
+lst = { cmd = "python $PIXI_PROJECT_ROOT/LST_AI/lst", depends-on = ["download-models"] }
