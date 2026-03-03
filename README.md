@@ -48,7 +48,7 @@ pixi install
 On the first run, LST-AI needs to download model weights, atlas files, and binaries (~several hundred MB). This happens automatically:
 
 ```bash
-pixi run lst --help
+pixi run lst
 ```
 
 This triggers the download and also confirms the CLI is working. You should see the full list of arguments printed to your terminal.
