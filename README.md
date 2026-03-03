@@ -36,7 +36,7 @@ pixi --version
 ### Step 2: Clone and install LST-AI
 
 ```bash
-git clone https://github.com/CompImg/LST-AI.git
+git clone https://github.com/Arshya-Guru/LST-AI.git
 cd LST-AI
 pixi install
 ```
