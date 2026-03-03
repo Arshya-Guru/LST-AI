@@ -224,7 +224,7 @@ source /path/to/new/lst/virtual/environment/bin/activate
 
 4. Install LST-AI (and yes, with `pip -e` option!):
 ```bash
-git clone https://github.com/CompImg/LST-AI/
+git clone https://github.com/Arshya-Guru/LST-AI/
 cd LST-AI
 pip install -e .
 cd ..
